@@ -7,7 +7,7 @@ import numpy as np
 import logging
 
 
-def create_conv_net(X, image_z, image_width, image_height, image_channel, drop_conv):
+def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_conv):
     inputX = tf.reshape(X, [-1, image_z, image_width, image_height, 1])  # shape=(?, 32, 32, 1)
 
     # UNet model
@@ -132,7 +132,7 @@ def create_conv_net(X, image_z, image_width, image_height, image_channel, drop_c
 
 
 # Serve data by batches
-def next_batch(train_images, train_labels, batch_size, index_in_epoch):
+def _next_batch(train_images, train_labels, batch_size, index_in_epoch):
     start = index_in_epoch
     index_in_epoch += batch_size
 
@@ -173,10 +173,10 @@ class unet3dModule(object):
         self.lr = tf.placeholder('float')
         self.drop_conv = tf.placeholder('float')
 
-        self.Y_pred = create_conv_net(self.X, image_z, image_width, image_height, channels, self.drop_conv)
-        self.cost = self._get_cost(self.Y_pred, costname)
+        self.Y_pred = _create_conv_net(self.X, image_z, image_width, image_height, channels, self.drop_conv)
+        self.cost = self.__get_cost(self.Y_pred, costname)
 
-    def _get_cost(self, cost_name):
+    def __get_cost(self, cost_name):
         labelY_gt = tf.reshape(self.Y_gt,
                                [-1, self.image_z, self.image_width, self.image_height, self.channels])
         if cost_name == "dice coefficient":
@@ -192,7 +192,7 @@ class unet3dModule(object):
             loss = (2.0 * intersection + smooth) / (denominator + smooth)
         return -tf.reduce_mean(loss)
 
-    def getPredictimage(self, pred, threshold):
+    def __getPredictimage(self, pred, threshold):
         y1 = tf.reshape(pred, (1, -1))
         for i in range(len(y1[0])):
             if (y1[0][i] > threshold):
@@ -218,7 +218,7 @@ class unet3dModule(object):
 
         for i in range(train_epochs):
             # get new batch
-            batch_xs, batch_ys, index_in_epoch = next_batch(train_images, train_lanbels, batch_size, index_in_epoch)
+            batch_xs, batch_ys, index_in_epoch = _next_batch(train_images, train_lanbels, batch_size, index_in_epoch)
             # check progress on every 1st,2nd,...,10th,20th,...,100th... step
             if i % DISPLAY_STEP == 0 or (i + 1) == train_epochs:
                 train_loss = self.cost.eval(feed_dict={self.X: batch_xs[batch_size // 10:],
@@ -259,5 +259,5 @@ class unet3dModule(object):
             pred = sess.run(self.Y_pred, feed_dict={self.X: [test_images[i]],
                                                     self.Y_gt: y_dummy,
                                                     self.drop_conv: 0.8})
-            predictvalue[i] = self.getPredictimage(pred, threshvalue)
+            predictvalue[i] = self.__getPredictimage(pred, threshvalue)
         return predictvalue
