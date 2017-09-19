@@ -8,21 +8,22 @@ def train():
     '''
    Preprocessing for dataset
    '''
-    # Read data set (Train data from CSV file)
-    csv_data = pd.read_csv('train.csv')
-    data = csv_data.iloc[:, :].values
-    np.random.shuffle(data)
-
+    # Read  data set (Train data from CSV file)
+    csvmaskdata = pd.read_csv('mask.csv')
+    csvimagedata = pd.read_csv('image.csv')
+    maskdata = csvmaskdata.iloc[:, :].values
+    imagedata = csvimagedata.iloc[:, :].values
+    # shuffle imagedata and maskdata together
+    perm = np.arange(len(csvimagedata))
+    np.random.shuffle(perm)
+    imagedata = imagedata[perm]
+    maskdata = maskdata[perm]
     # Extracting images and labels from given data
-    data = data.astype(np.float)
+    imagedata = imagedata.astype(np.float)
+    maskdata = maskdata.astype(np.float)
     # Normalize from [0:255] => [0.0:1.0]
-    data = np.multiply(data, 1.0 / 255.0)
-    # For images
-    image_size = 512 * 512 * 128
-    images = data[:, image_size:]
-    # For labels
-    labels = data[:, :image_size - 1]
-    # Split data into training & validation
+    images = np.multiply(imagedata, 1.0 / 255.0)
+    labels = np.multiply(maskdata, 1.0 / 255.0)
     # Split data into training & validation
     train_images = images[0:]
     train_labels = labels[0:]
