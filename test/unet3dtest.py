@@ -30,7 +30,7 @@ def train():
 
     unet3d = unet3dModule(3, 512, 512, 1)
     unet3d.train(train_images, train_labels, "E:\pythonworkspace\\test\\model\\unet3d",
-                 "E:\\pythonworkspace\\test\\log", 0.0001, 0.8, 0.7, 5, 10)
+                 "E:\\pythonworkspace\\test\\log", 0.0001, 0.8, 0.7, 50000, 1)
 
 
 def predict():
