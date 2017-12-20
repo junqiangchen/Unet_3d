@@ -28,9 +28,9 @@ def train():
     train_images = images[0:]
     train_labels = labels[0:]
 
-    unet3d = unet3dModule(128, 512, 512, 1)
-    unet3d.train(train_images, train_labels, "E:\pythonworkspace\\neusoftProject\\NeusoftLibrary\\test\\model\\unet3d",
-                 "E:\\pythonworkspace\\neusoftProject\\NeusoftLibrary\\test\\log", 0.0001, 0.8, 0.7, 5, 10)
+    unet3d = unet3dModule(3, 512, 512, 1)
+    unet3d.train(train_images, train_labels, "E:\pythonworkspace\\test\\model\\unet3d",
+                 "E:\\pythonworkspace\\test\\log", 0.0001, 0.8, 0.7, 5, 10)
 
 
 def predict():
@@ -42,7 +42,7 @@ def predict():
     # convert from [0:255] => [0.0:1.0]
     test_images = np.multiply(test_images, 1.0 / 255.0)
     unet3d = unet3dModule(128, 512, 512, 1)
-    predictvalue = unet3d.prediction("E:\pythonworkspace\\neusoftProject\\NeusoftLibrary\\test\\model\\unet3d",
+    predictvalue = unet3d.prediction("E:\pythonworkspace\\test\\model\\unet3d",
                                      test_images)
     print(predictvalue[0])
 
