@@ -8,11 +8,11 @@ import logging
 
 
 def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_conv):
-    inputX = tf.reshape(X, [-1, image_z, image_width, image_height, 1])  # shape=(?, 32, 32, 1)
+    inputX = tf.reshape(X, [-1, image_width, image_height, image_z,image_channel])  # shape=(?, 32, 32, 1)
 
     # UNet model
     # layer1->convolution
-    W1_1 = weight_xavier_init(shape=[3, 3, 3, 1, 32], n_inputs=3 * 3 * 3 * 1, n_outputs=32)
+    W1_1 = weight_xavier_init(shape=[3, 3, 3, image_channel, 32], n_inputs=3 * 3 * 3 * image_channel, n_outputs=32)
     B1_1 = bias_variable([32])
     conv1_1 = tf.nn.dropout(tf.nn.relu(conv3d(inputX, W1_1) + B1_1), drop_conv)
 
@@ -64,7 +64,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv5_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv5_1, W5_2) + B5_2), drop_conv)
 
     # layer6->deconvolution
-    W6 = weight_xavier_init(shape=[3, 3, 3, 512, 256], n_inputs=3 * 3 * 3 * 512, n_outputs=256)
+    W6 = weight_xavier_init(shape=[3, 3, 3,256,512], n_inputs=3 * 3 * 3 * 512, n_outputs=256)
     B6 = bias_variable([256])
     dconv1 = tf.nn.relu(deconv3d(conv5_2, W6) + B6)
     dconv_concat1 = crop_and_concat(conv4_2, dconv1)
@@ -79,7 +79,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv7_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv7_1, W7_2) + B7_2), drop_conv)
 
     # layer8->deconvolution
-    W8 = weight_xavier_init(shape=[3, 3, 3, 256, 128], n_inputs=3 * 3 * 3 * 256, n_outputs=128)
+    W8 = weight_xavier_init(shape=[3, 3, 3, 128,256], n_inputs=3 * 3 * 3 * 256, n_outputs=128)
     B8 = bias_variable([128])
     dconv2 = tf.nn.relu(deconv3d(conv7_2, W8) + B8)
     dconv_concat2 = crop_and_concat(conv3_2, dconv2)
@@ -94,7 +94,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv9_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv9_1, W9_2) + B9_2), drop_conv)
 
     # layer10->deconvolution
-    W10 = weight_xavier_init(shape=[3, 3, 3, 128, 64], n_inputs=3 * 3 * 3 * 128, n_outputs=64)
+    W10 = weight_xavier_init(shape=[3, 3, 3, 64,128], n_inputs=3 * 3 * 3 * 128, n_outputs=64)
     B10 = bias_variable([64])
     dconv3 = tf.nn.relu(deconv3d(conv9_2, W10) + B10)
     dconv_concat3 = crop_and_concat(conv2_2, dconv3)
@@ -109,7 +109,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv11_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv11_1, W11_2) + B11_2), drop_conv)
 
     # layer 12->deconvolution
-    W12 = weight_xavier_init(shape=[3, 3, 3, 64, 32], n_inputs=3 * 3 * 3 * 64, n_outputs=32)
+    W12 = weight_xavier_init(shape=[3, 3, 3, 32,64], n_inputs=3 * 3 * 3 * 64, n_outputs=32)
     B12 = bias_variable([32])
     dconv4 = tf.nn.relu(deconv3d(conv11_2, W12) + B12)
     dconv_concat4 = crop_and_concat(conv1_2, dconv4)
@@ -192,14 +192,6 @@ class unet3dModule(object):
             loss = (2.0 * intersection + smooth) / (denominator + smooth)
         return -tf.reduce_mean(loss)
 
-    def __getPredictimage(self, pred, threshold):
-        y1 = tf.reshape(pred, (1, -1))
-        for i in range(len(y1[0])):
-            if (y1[0][i] > threshold):
-                y1[0][i] = 1
-        predictimage = tf.reshape(y1, tf.shape(pred))
-        return predictimage
-
     def train(self, train_images, train_lanbels, model_path, logs_path, learning_rate,
               dropout_conv=0.8, train_epochs=1000, batch_size=10):
         train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
@@ -259,5 +251,5 @@ class unet3dModule(object):
             pred = sess.run(self.Y_pred, feed_dict={self.X: [test_images[i]],
                                                     self.Y_gt: y_dummy,
                                                     self.drop_conv: 0.8})
-            predictvalue[i] = self.__getPredictimage(pred, threshvalue)
+            predictvalue[i] = pred
         return predictvalue
