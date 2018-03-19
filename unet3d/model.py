@@ -4,12 +4,12 @@
 from unet3d.layer import (conv3d, deconv3d, max_pool3d, crop_and_concat, weight_xavier_init, bias_variable)
 import tensorflow as tf
 import numpy as np
-import logging
+import cv2
+import os
 
 
 def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_conv):
-    inputX = tf.reshape(X, [-1, image_width, image_height, image_z,image_channel])  # shape=(?, 32, 32, 1)
-
+    inputX = tf.reshape(X, [-1, image_width, image_height, image_z, image_channel])  # shape=(?, 32, 32, 1)
     # UNet model
     # layer1->convolution
     W1_1 = weight_xavier_init(shape=[3, 3, 3, image_channel, 32], n_inputs=3 * 3 * 3 * image_channel, n_outputs=32)
@@ -64,7 +64,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv5_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv5_1, W5_2) + B5_2), drop_conv)
 
     # layer6->deconvolution
-    W6 = weight_xavier_init(shape=[3, 3, 3,256,512], n_inputs=3 * 3 * 3 * 512, n_outputs=256)
+    W6 = weight_xavier_init(shape=[3, 3, 3, 256, 512], n_inputs=3 * 3 * 3 * 512, n_outputs=256)
     B6 = bias_variable([256])
     dconv1 = tf.nn.relu(deconv3d(conv5_2, W6) + B6)
     dconv_concat1 = crop_and_concat(conv4_2, dconv1)
@@ -79,7 +79,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv7_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv7_1, W7_2) + B7_2), drop_conv)
 
     # layer8->deconvolution
-    W8 = weight_xavier_init(shape=[3, 3, 3, 128,256], n_inputs=3 * 3 * 3 * 256, n_outputs=128)
+    W8 = weight_xavier_init(shape=[3, 3, 3, 128, 256], n_inputs=3 * 3 * 3 * 256, n_outputs=128)
     B8 = bias_variable([128])
     dconv2 = tf.nn.relu(deconv3d(conv7_2, W8) + B8)
     dconv_concat2 = crop_and_concat(conv3_2, dconv2)
@@ -94,7 +94,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv9_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv9_1, W9_2) + B9_2), drop_conv)
 
     # layer10->deconvolution
-    W10 = weight_xavier_init(shape=[3, 3, 3, 64,128], n_inputs=3 * 3 * 3 * 128, n_outputs=64)
+    W10 = weight_xavier_init(shape=[3, 3, 3, 64, 128], n_inputs=3 * 3 * 3 * 128, n_outputs=64)
     B10 = bias_variable([64])
     dconv3 = tf.nn.relu(deconv3d(conv9_2, W10) + B10)
     dconv_concat3 = crop_and_concat(conv2_2, dconv3)
@@ -109,7 +109,7 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
     conv11_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv11_1, W11_2) + B11_2), drop_conv)
 
     # layer 12->deconvolution
-    W12 = weight_xavier_init(shape=[3, 3, 3, 32,64], n_inputs=3 * 3 * 3 * 64, n_outputs=32)
+    W12 = weight_xavier_init(shape=[3, 3, 3, 32, 64], n_inputs=3 * 3 * 3 * 64, n_outputs=32)
     B12 = bias_variable([32])
     dconv4 = tf.nn.relu(deconv3d(conv11_2, W12) + B12)
     dconv_concat4 = crop_and_concat(conv1_2, dconv4)
@@ -121,12 +121,12 @@ def _create_conv_net(X, image_z, image_width, image_height, image_channel, drop_
 
     W13_2 = weight_xavier_init(shape=[3, 3, 3, 32, 32], n_inputs=3 * 3 * 3 * 32, n_outputs=32)
     B13_2 = bias_variable([32])
-    conv13_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv13_1, W11_2) + B11_2), drop_conv)
+    conv13_2 = tf.nn.dropout(tf.nn.relu(conv3d(conv13_1, W13_2) + B13_2), drop_conv)
 
     # layer14->output
     W14 = weight_xavier_init(shape=[1, 1, 1, 32, 1], n_inputs=1 * 1 * 1 * 32, n_outputs=1)
     B14 = bias_variable([1])
-    output_map = tf.nn.dropout(tf.nn.sigmoid((conv13_2, W14) + B14), tf.constant(1.0))
+    output_map = tf.nn.sigmoid(conv3d(conv13_2, W14) + B14)
 
     return output_map
 
@@ -160,40 +160,35 @@ class unet3dModule(object):
     :param image_width: number of width in the input image
     :param channels: number of channels in the input image
     :param n_class: number of output labels
-    :param costname: name of the cost function.Default is "cross_entropy"
+    :param costname: name of the cost function.Default is "dice coefficient"
     """
 
     def __init__(self, image_z, image_height, image_width, channels=1, costname="dice coefficient"):
         self.image_z = image_z
-        self.image_with = image_width
+        self.image_width = image_width
         self.image_height = image_height
         self.channels = channels
-        self.X = tf.placeholder("float", shape=[None, image_z * image_height * image_width * channels])
-        self.Y_gt = tf.placeholder("float", shape=[None, image_z * image_height * image_width * channels])
+        self.X = tf.placeholder("float", shape=[None, image_z, image_height, image_width, channels])
+        self.Y_gt = tf.placeholder("float", shape=[None, image_z, image_height, image_width, channels])
         self.lr = tf.placeholder('float')
         self.drop_conv = tf.placeholder('float')
 
         self.Y_pred = _create_conv_net(self.X, image_z, image_width, image_height, channels, self.drop_conv)
-        self.cost = self.__get_cost(self.Y_pred, costname)
+        self.cost = self.__get_cost(costname)
 
     def __get_cost(self, cost_name):
-        labelY_gt = tf.reshape(self.Y_gt,
-                               [-1, self.image_z, self.image_width, self.image_height, self.channels])
         if cost_name == "dice coefficient":
             smooth = 1e-7
-            Z, H, W, C = self.Y_pred.get_shape().as_list()[1:]
-
+            Z, H, W, C = self.Y_gt.get_shape().as_list()[1:]
             pred_flat = tf.reshape(self.Y_pred, [-1, H * W * Z])
-            gt_flat = tf.reshape(labelY_gt, [-1, H * W * Z])
-
+            gt_flat = tf.reshape(self.Y_gt, [-1, H * W * Z])
             intersection = tf.reduce_sum(pred_flat * gt_flat, axis=1)
             denominator = tf.reduce_sum(gt_flat, axis=1) + tf.reduce_sum(pred_flat, axis=1)
-
             loss = (2.0 * intersection + smooth) / (denominator + smooth)
         return -tf.reduce_mean(loss)
 
     def train(self, train_images, train_lanbels, model_path, logs_path, learning_rate,
-              dropout_conv=0.8, train_epochs=1000, batch_size=10):
+              dropout_conv=0.8, train_epochs=1000, batch_size=2):
         train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
 
         init = tf.global_variables_initializer()
@@ -210,19 +205,33 @@ class unet3dModule(object):
 
         for i in range(train_epochs):
             # get new batch
-            batch_xs, batch_ys, index_in_epoch = _next_batch(train_images, train_lanbels, batch_size, index_in_epoch)
+            batch_xs_path, batch_ys_path, index_in_epoch = _next_batch(train_images, train_lanbels, batch_size,
+                                                                       index_in_epoch)
+            # Extracting images and labels from given data
+            batch_xs = np.empty((len(batch_xs_path), self.image_z, self.image_height, self.image_width, self.channels))
+            batch_ys = np.empty((len(batch_ys_path), self.image_z, self.image_height, self.image_width, self.channels))
+            for num in range(len(batch_xs_path)):
+                index = 0
+                for imagefile in os.listdir(batch_xs_path[num][0]):
+                    image = cv2.imread(batch_xs_path[num][0] + "/" + imagefile, cv2.IMREAD_GRAYSCALE)
+                    label = cv2.imread(batch_ys_path[num][0] + "/" + imagefile, cv2.IMREAD_GRAYSCALE)
+                    batch_xs[num, index, :, :, :] = np.reshape(image,
+                                                               (self.image_height, self.image_width, self.channels))
+                    batch_ys[num, index, :, :, :] = np.reshape(label,
+                                                               (self.image_height, self.image_width, self.channels))
+                    index += 1
+            batch_xs = batch_xs.astype(np.float)
+            batch_ys = batch_ys.astype(np.float)
+            # Normalize from [0:255] => [0.0:1.0]
+            batch_xs = np.multiply(batch_xs, 1.0 / 255.0)
+            batch_ys = np.multiply(batch_ys, 1.0 / 255.0)
             # check progress on every 1st,2nd,...,10th,20th,...,100th... step
             if i % DISPLAY_STEP == 0 or (i + 1) == train_epochs:
-                train_loss = self.cost.eval(feed_dict={self.X: batch_xs[batch_size // 10:],
-                                                       self.Y_gt: batch_ys[batch_size // 10:],
+                train_loss = self.cost.eval(feed_dict={self.X: batch_xs,
+                                                       self.Y_gt: batch_ys,
                                                        self.lr: learning_rate,
                                                        self.drop_conv: dropout_conv})
-                validation_loss = self.cost.eval(feed_dict={self.X: batch_xs[0:batch_size // 10],
-                                                            self.Y_gt: batch_ys[0:batch_size // 10],
-                                                            self.lr: learning_rate,
-                                                            self.drop_conv: dropout_conv})
-                print('epochs %d training_loss / validation_loss => %.2f / %.2f ' % (
-                    i, train_loss, validation_loss))
+                print('epochs %d training_loss => %.5f ' % (i, train_loss))
 
                 if i % (DISPLAY_STEP * 10) == 0 and i:
                     DISPLAY_STEP *= 10
@@ -238,18 +247,19 @@ class unet3dModule(object):
         save_path = saver.save(sess, model_path)
         print("Model saved in file:", save_path)
 
-    def prediction(self, model_path, test_images, threshvalue):
+    def prediction(self, model_path, test_images):
         init = tf.global_variables_initializer()
         saver = tf.train.Saver()
         sess = tf.InteractiveSession()
         sess.run(init)
         saver.restore(sess, model_path)
-
-        predictvalue = np.zeros(test_images.shape[0])
-        y_dummy = np.empty((test_images.shape[0], test_images.shape[1]))
-        for i in range(0, test_images.shape[0]):
-            pred = sess.run(self.Y_pred, feed_dict={self.X: [test_images[i]],
-                                                    self.Y_gt: y_dummy,
-                                                    self.drop_conv: 0.8})
-            predictvalue[i] = pred
-        return predictvalue
+        # test_images size(imagez,imgewidth,imageheight,channels)
+        test_images = np.reshape(test_images, (test_images.shape[0], test_images.shape[1], test_images.shape[2], 1))
+        y_dummy = test_images
+        pred = sess.run(self.Y_pred, feed_dict={self.X: [test_images],
+                                                self.Y_gt: [y_dummy],
+                                                self.drop_conv: 1})
+        result = pred.astype(np.float32) * 255.
+        result = np.clip(result, 0, 255).astype('uint8')
+        result = np.reshape(result, (test_images.shape[0], test_images.shape[1], test_images.shape[2]))
+        return result
