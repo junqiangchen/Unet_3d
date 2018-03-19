@@ -261,5 +261,5 @@ class unet3dModule(object):
                                                 self.drop_conv: 1})
         result = pred.astype(np.float32) * 255.
         result = np.clip(result, 0, 255).astype('uint8')
-        result = np.reshape(result, (test_images.shape[0], test_images.shape[1], test_images.shape[2]))
-        return result
+        output = np.reshape(result, (test_images.shape[0], test_images.shape[1], test_images.shape[2]))
+        return output
