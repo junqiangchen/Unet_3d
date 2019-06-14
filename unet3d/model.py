@@ -207,19 +207,17 @@ class unet3dModule(object):
             # get new batch
             batch_xs_path, batch_ys_path, index_in_epoch = _next_batch(train_images, train_lanbels, batch_size,
                                                                        index_in_epoch)
-            # Extracting images and labels from given data
-            batch_xs = np.empty((len(batch_xs_path), self.image_z, self.image_height, self.image_width, self.channels))
-            batch_ys = np.empty((len(batch_ys_path), self.image_z, self.image_height, self.image_width, self.channels))
+            batch_xs = np.empty((len(batch_xs_path), self.image_z, self.image_height, self.image_width,
+                                 self.channels))
+            batch_ys = np.empty((len(batch_ys_path), self.image_z, self.image_height, self.image_width,
+                                 self.channels))
             for num in range(len(batch_xs_path)):
-                index = 0
-                for imagefile in os.listdir(batch_xs_path[num][0]):
-                    image = cv2.imread(batch_xs_path[num][0] + "/" + imagefile, cv2.IMREAD_GRAYSCALE)
-                    label = cv2.imread(batch_ys_path[num][0] + "/" + imagefile, cv2.IMREAD_GRAYSCALE)
-                    batch_xs[num, index, :, :, :] = np.reshape(image,
-                                                               (self.image_height, self.image_width, self.channels))
-                    batch_ys[num, index, :, :, :] = np.reshape(label,
-                                                               (self.image_height, self.image_width, self.channels))
-                    index += 1
+                image = np.load(batch_xs_path[num])
+                label = np.load(batch_ys_path[num])
+                batch_xs[num, :, :, :, :] = np.reshape(image, (self.image_z, self.image_height, self.image_width,
+                                                               self.channels))
+                batch_ys[num, :, :, :, :] = np.reshape(label, (self.image_z, self.image_height, self.image_width,
+                                                               self.channels))
             batch_xs = batch_xs.astype(np.float)
             batch_ys = batch_ys.astype(np.float)
             # Normalize from [0:255] => [0.0:1.0]

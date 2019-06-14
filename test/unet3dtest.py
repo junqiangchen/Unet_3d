@@ -6,23 +6,19 @@ import cv2
 
 
 def train():
-    '''
-   Preprocessing for dataset
-   '''
     # Read  data set (Train data from CSV file)
-    csvmaskdata = pd.read_csv('D:\Project\python\\3D_luna16-lung-cancer\data/mask3d_lidc.csv')
-    csvimagedata = pd.read_csv('D:\Project\python\\3D_luna16-lung-cancer\data/image3d_lidc.csv')
-    maskdata = csvmaskdata.iloc[:, :].values
-    imagedata = csvimagedata.iloc[:, :].values
+    csvdata = pd.read_csv('dataprocess\\data/train.csv')
+    maskdata = csvdata.iloc[:, 1].values
+    imagedata = csvdata.iloc[:, 0].values
     # shuffle imagedata and maskdata together
-    perm = np.arange(len(csvimagedata))
+    perm = np.arange(len(imagedata))
     np.random.shuffle(perm)
-    train_images = imagedata[perm]
-    train_labels = maskdata[perm]
+    imagedata = imagedata[perm]
+    maskdata = maskdata[perm]
 
-    unet3d = unet3dModule(3, 512, 512, 1)
-    unet3d.train(train_images, train_labels, "D:\Project\python\download_projects\\Unet_3d-master\\test\\unet3d",
-                 "D:\Project\python\download_projects\\Unet_3d-master\\test\\log", learning_rate=0.0001,
+    unet3d = unet3dModule(32, 128, 128, 1)
+    unet3d.train(imagedata, maskdata, "log\\unet3d",
+                 "log", learning_rate=0.0001,
                  dropout_conv=0.8, train_epochs=5,
                  batch_size=1)
 
@@ -54,4 +50,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(2)
+    main(1)
